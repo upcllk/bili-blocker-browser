@@ -140,20 +140,51 @@ function extractCardInfo(cardEl) {
 }
 
 function shouldBlock(cardInfo, cardEl) {
-  if (!rules.enabled) return false;
+  if (!rules.enabled) return null;
 
-  if (rules.blockAds && isAdCard(cardEl)) return true;
+  if (rules.blockAds && isAdCard(cardEl)) return '广告/推广';
 
   const upName = normalizeText(cardInfo?.upName);
-  if (upName && (rules.upNames || []).some((u) => normalizeText(u) === upName)) return true;
+  if (upName && (rules.upNames || []).some((u) => normalizeText(u) === upName)) {
+    return `UP主: ${upName}`;
+  }
 
   const title = normalizeText(cardInfo?.title);
-  if (title && includesAnyKeyword(title, rules.titleKeywords)) return true;
+  if (title) {
+    const matchedKw = (rules.titleKeywords || []).find((kw) => {
+      const k = normalizeText(kw).toLowerCase();
+      return k && title.toLowerCase().includes(k);
+    });
+    if (matchedKw) return `标题关键词: ${matchedKw}`;
+  }
 
   const tagsText = (cardInfo?.tags || []).join(' ');
-  if (tagsText && includesAnyKeyword(tagsText, rules.tags)) return true;
+  if (tagsText) {
+    const matchedTag = (rules.tags || []).find((tag) => {
+      const t = normalizeText(tag).toLowerCase();
+      return t && tagsText.toLowerCase().includes(t);
+    });
+    if (matchedTag) return `Tag: ${matchedTag}`;
+  }
 
-  return false;
+  return null;
+}
+
+function removeCard(cardEl, reason, cardInfo) {
+  try {
+    console.log(
+      '[Bili Blocker] 已屏蔽:',
+      reason,
+      '| 标题:',
+      cardInfo?.title || '(未知)',
+      '| UP:',
+      cardInfo?.upName || '(未知)'
+    );
+    cardEl.remove();
+    blockedCount += 1;
+  } catch {
+    // ignore
+  }
 }
 
 function findCardRootFromNode(node) {
@@ -178,15 +209,6 @@ function findCardRootFromNode(node) {
   return null;
 }
 
-function removeCard(cardEl) {
-  try {
-    cardEl.remove();
-    blockedCount += 1;
-  } catch {
-    // ignore
-  }
-}
-
 function scanAndBlockWithin(root) {
   if (!rules.enabled) return;
 
@@ -202,8 +224,9 @@ function scanAndBlockWithin(root) {
 
   for (const cardEl of candidates) {
     const info = extractCardInfo(cardEl);
-    if (shouldBlock(info, cardEl)) {
-      removeCard(cardEl);
+    const reason = shouldBlock(info, cardEl);
+    if (reason) {
+      removeCard(cardEl, reason, info);
     }
   }
 }
@@ -292,8 +315,9 @@ function setupObserver() {
         const card = findCardRootFromNode(n);
         if (card) {
           const info = extractCardInfo(card);
-          if (shouldBlock(info, card)) {
-            removeCard(card);
+          const reason = shouldBlock(info, card);
+          if (reason) {
+            removeCard(card, reason, info);
             continue;
           }
         }
