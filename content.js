@@ -173,14 +173,32 @@ function shouldBlock(cardInfo, cardEl) {
 function removeCard(cardEl, reason, cardInfo) {
   try {
     console.log(
-      '[Bili Blocker] 已屏蔽:',
-      reason,
-      '| 标题:',
-      cardInfo?.title || '(未知)',
-      '| UP:',
-      cardInfo?.upName || '(未知)'
+      `%c[Bili Blocker] 已屏蔽`,
+      'color: #fb7299; font-weight: bold;',
+      `\n  📋 依据: ${reason}`,
+      `\n  🎬 标题: ${cardInfo?.title || '(未知)'}`,
+      `\n  👤 UP主: ${cardInfo?.upName || '(未知)'}`
     );
-    cardEl.remove();
+
+    // 找到 feed-card 或直接操作 cardEl
+    const feedCard = cardEl.closest('.feed-card');
+    const target = feedCard || cardEl;
+
+    // 隐藏卡片内容，保留占位（避免 grid 错位）
+    const videoCard = target.querySelector('.bili-video-card') || target;
+
+    // 设置隐藏样式
+    videoCard.style.cssText = `
+      opacity: 0 !important;
+      pointer-events: none !important;
+      height: 0 !important;
+      min-height: 0 !important;
+      overflow: hidden !important;
+    `;
+
+    // 添加已屏蔽标记
+    target.setAttribute('data-bili-blocker', 'blocked');
+
     blockedCount += 1;
   } catch {
     // ignore
