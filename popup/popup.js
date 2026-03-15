@@ -220,4 +220,54 @@ async function main() {
   setInterval(refreshBlockedCount, 700);
 }
 
-document.addEventListener('DOMContentLoaded', main);
+function setupImportExport() {
+  const exportBtn = document.getElementById('exportBtn');
+  const importBtn = document.getElementById('importBtn');
+  const importFile = document.getElementById('importFile');
+
+  if (!exportBtn || !importBtn || !importFile) return;
+
+  // 导出配置
+  exportBtn.addEventListener('click', async () => {
+    try {
+      const rules = await getRules();
+      const blob = new Blob([JSON.stringify(rules, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bili-blocker-config-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      alert('配置已导出！你可以把这个 JSON 文件保存到项目目录，在其他浏览器导入。');
+    } catch (err) {
+      alert('导出失败: ' + err.message);
+    }
+  });
+
+  // 导入配置
+  importBtn.addEventListener('click', () => importFile.click());
+  importFile.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!data || typeof data !== 'object') throw new Error('无效的配置文件');
+
+      const newRules = { ...DEFAULT_RULES, ...data };
+      await setRules(newRules);
+      alert('配置导入成功！');
+      location.reload();
+    } catch (err) {
+      alert('导入失败: ' + err.message);
+    } finally {
+      importFile.value = ''; // 重置，允许重复导入同一文件
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  main();
+  setupImportExport();
+});
