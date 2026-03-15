@@ -180,24 +180,12 @@ function removeCard(cardEl, reason, cardInfo) {
       `\n  👤 UP主: ${cardInfo?.upName || '(未知)'}`
     );
 
-    // 找到 feed-card 或直接操作 cardEl
-    const feedCard = cardEl.closest('.feed-card');
-    const target = feedCard || cardEl;
+    // 找到 grid item: .bili-feed-card 或 .feed-card
+    const gridItem = cardEl.closest('.bili-feed-card') || cardEl.closest('.feed-card');
+    const target = gridItem || cardEl;
 
-    // 隐藏卡片内容，保留占位（避免 grid 错位）
-    const videoCard = target.querySelector('.bili-video-card') || target;
-
-    // 设置隐藏样式
-    videoCard.style.cssText = `
-      opacity: 0 !important;
-      pointer-events: none !important;
-      height: 0 !important;
-      min-height: 0 !important;
-      overflow: hidden !important;
-    `;
-
-    // 添加已屏蔽标记
-    target.setAttribute('data-bili-blocker', 'blocked');
+    // 直接移除整个 grid item，不留白框
+    target.remove();
 
     blockedCount += 1;
   } catch {
