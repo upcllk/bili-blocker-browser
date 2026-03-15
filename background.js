@@ -2,6 +2,89 @@
 
 const STORAGE_KEY = 'blockRules';
 
+/**
+ * 通过 bvid 获取视频 cid
+ * @param {string} bvid - 视频的bvid
+ * @returns {Promise<{cid?: string, error?: string}>}
+ */
+async function fetchCidByBvid(bvid) {
+  try {
+    const url = `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (data.code !== 0) {
+      throw new Error(`API error: ${data.message}`);
+    }
+
+    // 获取第一个分P的cid（默认）
+    const cid = data.data?.cid;
+    if (cid) {
+      return { cid: String(cid) };
+    }
+
+    // 如果有多个分P，取第一个
+    const pages = data.data?.pages;
+    if (pages && pages.length > 0 && pages[0].cid) {
+      return { cid: String(pages[0].cid) };
+    }
+
+    return { error: 'No cid found in response' };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+/**
+ * 获取原始弹幕 XML
+ * @param {string} cid - 视频的cid
+ * @returns {Promise<{xml?: string, error?: string}>}
+ */
+async function fetchDanmakuXmlRaw(cid) {
+  // 尝试接口1: list.so
+  try {
+    const url1 = `https://api.bilibili.com/x/v1/dm/list.so?oid=${cid}`;
+    const response1 = await fetch(url1, {
+      headers: {
+        'Accept': '*/*',
+        'Referer': 'https://www.bilibili.com'
+      }
+    });
+    if (response1.ok) {
+      const text = await response1.text();
+      if (text.includes('<d ')) {
+        return { xml: text };
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  // 尝试接口2: comment.bilibili.com
+  try {
+    const url2 = `https://comment.bilibili.com/${cid}.xml`;
+    const response2 = await fetch(url2, {
+      headers: {
+        'Accept': 'application/xml, text/xml, */*',
+        'Referer': 'https://www.bilibili.com'
+      }
+    });
+    if (response2.ok) {
+      const text = await response2.text();
+      if (text.includes('<d ')) {
+        return { xml: text };
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return { error: 'Failed to fetch danmaku from all sources' };
+}
+
 const DEFAULT_RULES = {
   enabled: true,
   blockAds: true,
@@ -84,6 +167,28 @@ async function requestLastHoveredCard(tabId) {
     return null;
   }
 }
+
+// 监听来自 content script 的消息
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || typeof msg !== 'object') return false;
+
+  if (msg.type === 'BB_FETCH_DANMAKU' && msg.cid) {
+    // 返回原始 XML，让 content script 解析（Service Worker 没有 DOMParser）
+    fetchDanmakuXmlRaw(msg.cid).then((result) => {
+      sendResponse({ ok: !result.error, xml: result.xml, error: result.error });
+    });
+    return true; // 保持通道开放，等待异步响应
+  }
+
+  if (msg.type === 'BB_FETCH_CID_BY_BVID' && msg.bvid) {
+    fetchCidByBvid(msg.bvid).then((result) => {
+      sendResponse({ ok: !result.error, cid: result.cid, error: result.error });
+    });
+    return true;
+  }
+
+  return false;
+});
 
 chrome.runtime.onInstalled.addListener(async () => {
   await ensureMenus();

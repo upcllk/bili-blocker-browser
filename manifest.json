@@ -11,7 +11,9 @@
     "https://www.bilibili.com/video/*",
     "https://www.bilibili.com/read/*",
     "https://www.bilibili.com/ranking/*",
-    "https://www.bilibili.com/v/popular/*"
+    "https://www.bilibili.com/v/popular/*",
+    "https://api.bilibili.com/*",
+    "https://comment.bilibili.com/*"
   ],
   "background": {
     "service_worker": "background.js",
