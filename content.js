@@ -521,6 +521,180 @@ function logDanmakuStats(data) {
   }
 }
 
+// ==================== 广告分析层 ====================
+
+/** @type {Array<{start: number, end: number}>} 检测到的广告区间 */
+let detectedAdIntervals = [];
+
+/** @type {boolean} 是否已初始化视频监听 */
+let videoMonitorInitialized = false;
+
+/**
+ * 广告分析器 - 根据弹幕分析广告区间
+ * TODO: 当前为硬编码，后续根据弹幕关键词分析
+ * @param {Array} danmakuList - 弹幕列表
+ * @returns {Array<{start: number, end: number}>} 广告区间数组
+ */
+function analyzeAdIntervals(danmakuList) {
+  // 当前硬编码返回第5秒到第10秒作为广告区间
+  // 后续实现：根据弹幕关键词密度、时间分布等分析
+  const hardcodedIntervals = [
+    { start: 5, end: 10 }  // 第5秒到第10秒
+  ];
+
+  console.log('[Bili Blocker] 广告分析完成，检测到区间:', hardcodedIntervals);
+  return hardcodedIntervals;
+}
+
+/**
+ * 获取视频元素
+ * B站播放页使用标准 video 标签
+ */
+function getVideoElement() {
+  // 优先查找播放器内的 video 标签
+  const selectors = [
+    'video',                                    // 标准 video 标签
+    '.bpx-player-video-wrap video',            // bpx 播放器
+    '.bilibili-player-video video',            // 旧版播放器
+    '#bilibili-player video',                  // B站播放器内
+  ];
+
+  for (const selector of selectors) {
+    const video = document.querySelector(selector);
+    if (video && video.duration > 0) {
+      console.log('[Bili Blocker] 找到视频元素:', selector, '时长:', video.duration.toFixed(2) + 's');
+      return video;
+    }
+  }
+
+  console.log('[Bili Blocker] 未找到视频元素');
+  return null;
+}
+
+/**
+ * 跳过广告区间
+ * @param {HTMLVideoElement} video - 视频元素
+ * @param {number} targetTime - 目标时间（秒）
+ */
+function skipToTime(video, targetTime) {
+  if (!video) return;
+
+  const currentTime = video.currentTime;
+  console.log(`[Bili Blocker] ⏭️ 跳过广告: ${currentTime.toFixed(2)}s -> ${targetTime}s`);
+
+  // 执行跳转
+  video.currentTime = targetTime;
+
+  // 可选：显示跳过提示
+  showSkipNotification(targetTime - currentTime);
+}
+
+/**
+ * 显示跳过提示（可选）
+ * @param {number} skipDuration - 跳过的时长
+ */
+function showSkipNotification(skipDuration) {
+  // 创建临时提示元素
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: #fb7299;
+    color: white;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    z-index: 99999;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    animation: bb-fade-in-out 2s ease forwards;
+  `;
+  notification.textContent = `⏭️ 已跳过 ${skipDuration.toFixed(1)} 秒广告`;
+
+  // 添加动画样式
+  if (!document.getElementById('bb-notification-style')) {
+    const style = document.createElement('style');
+    style.id = 'bb-notification-style';
+    style.textContent = `
+      @keyframes bb-fade-in-out {
+        0% { opacity: 0; transform: translateY(-10px); }
+        20% { opacity: 1; transform: translateY(0); }
+        80% { opacity: 1; transform: translateY(0); }
+        100% { opacity: 0; transform: translateY(-10px); }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  document.body.appendChild(notification);
+
+  // 2秒后移除
+  setTimeout(() => {
+    notification.remove();
+  }, 2000);
+}
+
+/**
+ * 初始化视频广告跳过监听
+ * @param {Array<{start: number, end: number}>} adIntervals - 广告区间
+ */
+function initAdSkipMonitor(adIntervals) {
+  if (videoMonitorInitialized) return;
+
+  const video = getVideoElement();
+  if (!video) {
+    // 视频可能还没加载，延迟重试（只重试3次）
+    if (!initAdSkipMonitor.retryCount) initAdSkipMonitor.retryCount = 0;
+    initAdSkipMonitor.retryCount++;
+
+    if (initAdSkipMonitor.retryCount <= 3) {
+      console.log('[Bili Blocker] 视频元素未就绪，1秒后重试...');
+      setTimeout(() => initAdSkipMonitor(adIntervals), 1000);
+    } else {
+      console.log('[Bili Blocker] 视频元素获取失败，放弃广告跳过监听');
+    }
+    return;
+  }
+
+  // 重置重试计数
+  initAdSkipMonitor.retryCount = 0;
+  videoMonitorInitialized = true;
+  detectedAdIntervals = adIntervals;
+  console.log('[Bili Blocker] 初始化广告跳过监听，区间:', adIntervals);
+
+  // 使用 timeupdate 事件监听播放进度
+  const onTimeUpdate = () => {
+    const currentTime = video.currentTime;
+
+    // 检查是否在广告区间起点
+    for (const interval of detectedAdIntervals) {
+      // 当播放时间进入广告区间起点（允许0.3秒误差，更精确）
+      if (currentTime >= interval.start && currentTime < interval.start + 0.3) {
+        // 检查是否已经跳过（防止重复跳转）
+        if (!video.dataset.bbSkipped) {
+          video.dataset.bbSkipped = 'true';
+          skipToTime(video, interval.end);
+
+          // 重置标记，允许下次再跳过（5秒后，避免误跳）
+          setTimeout(() => {
+            delete video.dataset.bbSkipped;
+          }, 5000);
+        }
+        break;
+      }
+    }
+  };
+
+  video.addEventListener('timeupdate', onTimeUpdate);
+
+  // 视频跳转后重置跳过标记
+  video.addEventListener('seeked', () => {
+    delete video.dataset.bbSkipped;
+  });
+
+  console.log('[Bili Blocker] 广告跳过监听已启动 - 将在第', adIntervals.map(i => i.start + 's').join(', '), '自动跳过');
+}
+
 /**
  * 将秒数格式化为 MM:SS
  */
@@ -599,6 +773,16 @@ async function fetchDanmakuFromBackground(cid) {
       };
 
       logDanmakuStats(data);
+
+      // ========== 广告分析和跳过逻辑 ==========
+      // 分析广告区间
+      const adIntervals = analyzeAdIntervals(danmakuList);
+
+      // 初始化视频广告跳过监听
+      if (adIntervals.length > 0) {
+        initAdSkipMonitor(adIntervals);
+      }
+
     } else {
       console.error('[Bili Blocker] 获取弹幕失败:', response?.error || '未知错误');
       logDanmakuStats({ count: 0, totalLength: 0, first10: [], last10: [], error: response?.error });
@@ -684,6 +868,16 @@ function initPlayPageDanmaku() {
 }
 
 /**
+ * 重置播放页相关状态
+ */
+function resetPlayPageState() {
+  danmakuFetched = false;
+  videoMonitorInitialized = false;
+  detectedAdIntervals = [];
+  if (initAdSkipMonitor) initAdSkipMonitor.retryCount = 0;
+}
+
+/**
  * 监听 SPA 路由变化，重新检测播放页
  */
 function setupRouteChangeListener() {
@@ -693,7 +887,7 @@ function setupRouteChangeListener() {
     const currentUrl = location.href;
     if (currentUrl !== lastUrl) {
       lastUrl = currentUrl;
-      danmakuFetched = false; // 重置标记，允许新页面获取弹幕
+      resetPlayPageState();
       initPlayPageDanmaku();
     }
   });
@@ -705,7 +899,7 @@ function setupRouteChangeListener() {
 
   // 同时监听 popstate 事件
   window.addEventListener('popstate', () => {
-    danmakuFetched = false;
+    resetPlayPageState();
     initPlayPageDanmaku();
   });
 }
