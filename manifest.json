@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Bili Blocker",
+  "version": "0.1.0",
+  "description": "屏蔽 Bilibili 网页端不想看的内容：推广/UP 主/Tag/标题关键词",
+  "permissions": ["storage", "contextMenus", "activeTab"],
+  "host_permissions": [
+    "https://www.bilibili.com/*",
+    "https://search.bilibili.com/*",
+    "https://www.bilibili.com/v/*",
+    "https://www.bilibili.com/video/*",
+    "https://www.bilibili.com/read/*",
+    "https://www.bilibili.com/ranking/*",
+    "https://www.bilibili.com/v/popular/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Bili Blocker",
+    "default_popup": "popup/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.bilibili.com/*",
+        "https://search.bilibili.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bili Blocker</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="header">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">BB</div>
+        <div class="titles">
+          <div class="name">Bili Blocker</div>
+          <div class="subtitle">屏蔽推广 / UP 主 / Tag / 标题关键词</div>
+        </div>
+      </div>
+
+      <label class="toggle" title="启用/禁用插件">
+        <input id="enabledToggle" type="checkbox" />
+        <span class="track"><span class="thumb"></span></span>
+      </label>
+    </header>
+
+    <main class="main">
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">自动屏蔽推广内容</div>
+            <div class="card-desc">识别带“推广/广告”标识的卡片并移除</div>
+          </div>
+          <label class="toggle small" title="是否自动屏蔽推广">
+            <input id="adsToggle" type="checkbox" />
+            <span class="track"><span class="thumb"></span></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">屏蔽 UP 主（精确匹配）</div>
+            <div class="card-desc">命中后移除该 UP 主的所有视频卡片</div>
+          </div>
+        </div>
+        <div class="rule-list" id="upList"></div>
+        <div class="rule-input">
+          <input id="upInput" type="text" placeholder="输入 UP 主名称，如：某某UP" />
+          <button id="upAddBtn" class="btn">添加</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">屏蔽视频 Tag（包含匹配）</div>
+            <div class="card-desc">命中后移除包含该 tag 的卡片</div>
+          </div>
+        </div>
+        <div class="chip-list" id="tagList"></div>
+        <div class="rule-input">
+          <input id="tagInput" type="text" placeholder="输入 Tag，如：带货 / 游戏" />
+          <button id="tagAddBtn" class="btn">添加</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">屏蔽标题关键词（包含匹配）</div>
+            <div class="card-desc">命中后移除标题中包含关键词的视频卡片</div>
+          </div>
+        </div>
+        <div class="rule-list" id="kwList"></div>
+        <div class="rule-input">
+          <input id="kwInput" type="text" placeholder="输入关键词，如：推广 / 某游戏" />
+          <button id="kwAddBtn" class="btn">添加</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="stat">本页已屏蔽 <span id="blockedCount">0</span> 条</div>
+      <div class="hint">提示：在视频卡片上悬停后右键，可一键屏蔽 UP 主或标题</div>
+    </footer>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
